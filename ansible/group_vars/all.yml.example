@@ -7,8 +7,8 @@ discord_token: "YOUR_DISCORD_TOKEN"
 guild_id: "YOUR_GUILD_ID"  # The Discord server ID where the bot will be used
 
 # Go version
-go_version: "1.21.6"
-go_checksum: "3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb33c8f8fd9d08c6480"  # SHA256 for go1.21.6.linux-amd64.tar.gz
+go_version: "1.24.0"
+go_checksum: "e3d28a2973916c23bdee22b0ba3159d4c4a62d788ba4c2ec6236849842adeb06"  # SHA256 for go1.24.0.linux-amd64.tar.gz
 
 # Logging configuration
 log_retention_days: 14
