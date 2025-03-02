@@ -10,6 +10,8 @@ ExecStart=/usr/local/go/bin/go run main.go
 Restart=always
 RestartSec=10
 Environment=DISCORD_TOKEN={{ discord_token }}
+StandardOutput=append:/var/log/dr-peste/bot.log
+StandardError=append:/var/log/dr-peste/error.log
 
 [Install]
 WantedBy=multi-user.target 

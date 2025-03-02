@@ -13,6 +13,7 @@
         name:
           - git
           - wget
+          - logrotate
         state: present
 
     - name: Download Go
@@ -45,6 +46,25 @@
         create_home: yes
         system: yes
 
+    - name: Create log directory
+      file:
+        path: /var/log/dr-peste
+        state: directory
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        mode: '0755'
+
+    - name: Create log files
+      file:
+        path: "{{ item }}"
+        state: touch
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        mode: '0640'
+      with_items:
+        - /var/log/dr-peste/bot.log
+        - /var/log/dr-peste/error.log
+
     - name: Clone/update repository
       git:
         repo: "{{ bot_repo }}"
@@ -58,6 +78,12 @@
         dest: /etc/systemd/system/dr-peste.service
         mode: '0644'
       notify: restart dr-peste
+
+    - name: Configure logrotate
+      template:
+        src: templates/dr-peste.logrotate.j2
+        dest: /etc/logrotate.d/dr-peste
+        mode: '0644'
 
     - name: Enable and start dr-peste service
       systemd:
