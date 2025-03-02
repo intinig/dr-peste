@@ -1,6 +1,6 @@
-/var/log/dr-peste/*.log {
+{{ log_directory }}/*.log {
     daily
-    rotate 14
+    rotate {{ log_retention_days }}
     compress
     delaycompress
     missingok

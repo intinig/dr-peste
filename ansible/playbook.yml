@@ -48,7 +48,7 @@
 
     - name: Create log directory
       file:
-        path: /var/log/dr-peste
+        path: "{{ log_directory }}"
         state: directory
         owner: "{{ bot_user }}"
         group: "{{ bot_user }}"
@@ -62,8 +62,8 @@
         group: "{{ bot_user }}"
         mode: '0640'
       with_items:
-        - /var/log/dr-peste/bot.log
-        - /var/log/dr-peste/error.log
+        - "{{ log_directory }}/bot.log"
+        - "{{ log_directory }}/error.log"
 
     - name: Clone/update repository
       git:

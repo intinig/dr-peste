@@ -1,0 +1,15 @@
+---
+# Bot configuration
+bot_user: dr-peste
+bot_home: "/home/{{ bot_user }}"
+bot_repo: "https://github.com/intinig/dr-peste.git"
+discord_token: "YOUR_DISCORD_TOKEN"
+guild_id: "YOUR_GUILD_ID"  # The Discord server ID where the bot will be used
+
+# Go version
+go_version: "1.21.6"
+go_checksum: "3f934f40ac360b9c01f616a9aa1796d227d8b0328bf64cb33c8f8fd9d08c6480"  # SHA256 for go1.21.6.linux-amd64.tar.gz
+
+# Logging configuration
+log_retention_days: 14
+log_directory: "/var/log/dr-peste" 
