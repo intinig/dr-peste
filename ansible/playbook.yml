@@ -65,12 +65,20 @@
         - "{{ log_directory }}/bot.log"
         - "{{ log_directory }}/error.log"
 
+    - name: Create bin directory
+      file:
+        path: "{{ bot_home }}/bin"
+        state: directory
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        mode: '0755'
+
     - name: Clone/update repository
       git:
         repo: "{{ bot_repo }}"
         dest: "{{ bot_home }}/dr-peste"
         force: yes
-      become: yes  # Run as root
+      become: yes
       become_user: root
 
     - name: Fix repository ownership
@@ -81,6 +89,19 @@
         group: "{{ bot_user }}"
         recurse: yes
       become: yes
+
+    - name: Compile bot binary
+      command:
+        cmd: /usr/local/go/bin/go build -o {{ bot_home }}/bin/dr-peste
+        chdir: "{{ bot_home }}/dr-peste"
+      become: yes
+      become_user: "{{ bot_user }}"
+      environment:
+        PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
+        GOPATH: "/usr/local/go"
+      register: compile_result
+      changed_when: compile_result.rc == 0
+      notify: restart dr-peste
 
     - name: Create systemd service
       template:
