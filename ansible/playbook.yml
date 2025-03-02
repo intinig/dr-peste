@@ -102,13 +102,21 @@
         cmd: /usr/local/go/bin/go build -o {{ bot_home }}/bin/dr-peste
         chdir: "{{ bot_home }}/dr-peste"
       become: yes
-      become_user: "{{ bot_user }}"
+      become_user: root
       environment:
         PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
         GOPATH: "/usr/local/go"
       register: compile_result
       changed_when: compile_result.rc == 0
       notify: restart dr-peste
+
+    - name: Fix binary ownership
+      file:
+        path: "{{ bot_home }}/bin/dr-peste"
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        mode: '0755'
+      become: yes
 
     - name: Create systemd service
       template:
