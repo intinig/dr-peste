@@ -957,57 +957,45 @@ func handleSlashProfits(s *discordgo.Session, i *discordgo.InteractionCreate, da
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 	})
 
-	// Get all items to build a map of all users who have participated
-	items, err := db.ListItems()
+	// Create a map to store user profits
+	type UserProfit struct {
+		UserID     string
+		Total      int64
+		LastProfit time.Time
+	}
+	userProfits := make(map[string]*UserProfit)
+
+	// Get all profit history records
+	records, err := db.GetAllProfitHistory()
 	if err != nil {
-		log.Printf("Error listing items: %v", err)
+		log.Printf("Error getting profit history: %v", err)
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content: strPtr("❌ Failed to get items: " + err.Error()),
+			Content: strPtr("❌ Failed to get profit history: " + err.Error()),
 		})
 		return
 	}
 
-	// Create a map to track unique users
-	userIDs := make(map[string]bool)
-	for _, item := range items {
-		for _, p := range item.Participants {
-			userIDs[p.UserID] = true
-		}
-	}
-
-	// Create a slice to store user profits
-	type UserProfit struct {
-		UserID    string
-		Total     int64
-		LastProfit time.Time
-	}
-	var profits []UserProfit
-
-	// Get total profits for each user
-	for userID := range userIDs {
-		// Get profit history for this user
-		history, err := db.GetUserProfitHistory(userID)
-		if err != nil {
-			log.Printf("Error getting profit history for user %s: %v", userID, err)
-			continue
-		}
-
-		// Calculate total and get last profit date
-		var total int64
-		var lastProfit time.Time
-		for _, record := range history {
-			total += record.Amount
-			if record.TransactionDate.After(lastProfit) {
-				lastProfit = record.TransactionDate
+	// Calculate totals and last profit dates for each user
+	for _, record := range records {
+		profit, exists := userProfits[record.UserID]
+		if !exists {
+			profit = &UserProfit{
+				UserID: record.UserID,
 			}
+			userProfits[record.UserID] = profit
 		}
 
-		if total > 0 {
-			profits = append(profits, UserProfit{
-				UserID:    userID,
-				Total:     total,
-				LastProfit: lastProfit,
-			})
+		profit.Total += record.Amount
+		if record.TransactionDate.After(profit.LastProfit) {
+			profit.LastProfit = record.TransactionDate
+		}
+	}
+
+	// Convert map to slice for sorting
+	var profits []UserProfit
+	for _, p := range userProfits {
+		if p.Total > 0 {
+			profits = append(profits, *p)
 		}
 	}
 

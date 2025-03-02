@@ -484,6 +484,34 @@ func GetTotalUserProfit(userID string) (int64, error) {
 	return total, err
 }
 
+// GetAllProfitHistory retrieves all profit history records
+func GetAllProfitHistory() ([]ProfitRecord, error) {
+	rows, err := db.Query(`
+		SELECT p.id, p.user_id, p.item_id, i.name, p.amount, p.transaction_date
+		FROM profit_history p
+		JOIN items i ON p.item_id = i.id
+		ORDER BY p.transaction_date DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []ProfitRecord
+	for rows.Next() {
+		var record ProfitRecord
+		if err := rows.Scan(
+			&record.ID, &record.UserID, &record.ItemID, &record.ItemName,
+			&record.Amount, &record.TransactionDate,
+		); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
 // Close closes the database connection
 func Close() {
 	if db != nil {
