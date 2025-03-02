@@ -70,7 +70,17 @@
         repo: "{{ bot_repo }}"
         dest: "{{ bot_home }}/dr-peste"
         force: yes
+      become: yes
       become_user: "{{ bot_user }}"
+
+    # Fix permissions after clone
+    - name: Ensure correct ownership of bot directory
+      file:
+        path: "{{ bot_home }}/dr-peste"
+        state: directory
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        recurse: yes
 
     - name: Create systemd service
       template:
