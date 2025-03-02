@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -12,6 +13,16 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/intinig/dr-peste/db"
+)
+
+var (
+	startTime = time.Now()
+
+	// Info command
+	infoCommand = &discordgo.ApplicationCommand{
+		Name:        "info",
+		Description: "Show bot version and uptime",
+	}
 )
 
 // SlashCommands returns a list of all slash commands
@@ -36,7 +47,7 @@ func SlashCommands() []*discordgo.ApplicationCommand {
 						{
 							Type:        discordgo.ApplicationCommandOptionInteger,
 							Name:        "amount",
-							Description: "Estimated value in Exalted Orbs",
+							Description: "Number of items dropped",
 							Required:    true,
 						},
 						{
@@ -124,6 +135,11 @@ func SlashCommands() []*discordgo.ApplicationCommand {
 					Name:        "help",
 					Description: "Show help information",
 				},
+				{
+					Type:        discordgo.ApplicationCommandOptionSubCommand,
+					Name:        "info",
+					Description: "Show bot version and uptime",
+				},
 			},
 		},
 	}
@@ -143,16 +159,16 @@ func RegisterSlashCommands(s *discordgo.Session) {
 // handleAutocomplete handles autocomplete interactions
 func handleAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
-	
+
 	// Only handle docteur commands
 	if data.Name != "docteur" || len(data.Options) == 0 {
 		log.Printf("[Autocomplete] Rejected non-docteur command: %s", data.Name)
 		return
 	}
-	
+
 	subCommand := data.Options[0]
 	log.Printf("[Autocomplete] Processing request for /docteur %s from user %s", subCommand.Name, i.Member.User.Username)
-	
+
 	// Check which subcommand is being used
 	switch subCommand.Name {
 	case "view", "sell", "profits":
@@ -182,28 +198,28 @@ func handleItemAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate
 		log.Printf("Error listing items for autocomplete: %v", err)
 		return
 	}
-	
+
 	// Filter items based on the query and command context
 	var choices []*discordgo.ApplicationCommandOptionChoice
 	query = strings.ToLower(query)
-	
+
 	// Get the subcommand name to filter appropriately
 	subCommand := i.ApplicationCommandData().Options[0].Name
-	
+
 	for _, item := range items {
 		// For sell command, only show pending items
 		if subCommand == "sell" && item.Status != "assigned" {
 			continue
 		}
-		
+
 		// Check if the query matches the item ID or name
 		idStr := strconv.FormatInt(item.ID, 10)
 		itemName := strings.ToLower(item.Name)
-		
+
 		if strings.Contains(idStr, query) || strings.Contains(itemName, query) {
 			// Format the choice with ID and name
 			choiceName := fmt.Sprintf("#%d: %s", item.ID, item.Name)
-			
+
 			// Add status indicator
 			switch item.Status {
 			case "assigned":
@@ -213,20 +229,20 @@ func handleItemAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate
 			case "distributed":
 				choiceName += " (✅ Distributed)"
 			}
-			
+
 			// Add the choice with the ID as the value
 			choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
 				Name:  choiceName,
 				Value: idStr,
 			})
-			
+
 			// Limit to 25 choices (Discord's maximum)
 			if len(choices) >= 25 {
 				break
 			}
 		}
 	}
-	
+
 	// Respond with the choices
 	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
@@ -234,7 +250,7 @@ func handleItemAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate
 			Choices: choices,
 		},
 	})
-	
+
 	if err != nil {
 		log.Printf("Error responding to autocomplete: %v", err)
 	}
@@ -248,24 +264,24 @@ func handleItemNameAutocomplete(s *discordgo.Session, i *discordgo.InteractionCr
 		log.Printf("Error listing items for name autocomplete: %v", err)
 		return
 	}
-	
+
 	// Create a map to track unique item names
 	uniqueNames := make(map[string]bool)
-	
+
 	// Filter items based on the query
 	var choices []*discordgo.ApplicationCommandOptionChoice
 	query = strings.ToLower(query)
-	
+
 	// First add exact matches
 	for _, item := range items {
 		itemName := item.Name
 		itemNameLower := strings.ToLower(itemName)
-		
+
 		// Skip if we've already added this name
 		if uniqueNames[itemName] {
 			continue
 		}
-		
+
 		// Check if the query matches the item name
 		if strings.Contains(itemNameLower, query) {
 			// Add the choice with the name as both display and value
@@ -273,17 +289,17 @@ func handleItemNameAutocomplete(s *discordgo.Session, i *discordgo.InteractionCr
 				Name:  itemName,
 				Value: itemName,
 			})
-			
+
 			// Mark this name as added
 			uniqueNames[itemName] = true
-			
+
 			// Limit to 25 choices (Discord's maximum)
 			if len(choices) >= 25 {
 				break
 			}
 		}
 	}
-	
+
 	// Respond with the choices
 	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
@@ -291,7 +307,7 @@ func handleItemNameAutocomplete(s *discordgo.Session, i *discordgo.InteractionCr
 			Choices: choices,
 		},
 	})
-	
+
 	if err != nil {
 		log.Printf("Error responding to name autocomplete: %v", err)
 	}
@@ -306,7 +322,7 @@ func handleSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if data.Name == "docteur" && len(data.Options) > 0 {
 		subCommand := data.Options[0]
 		log.Printf("[Command] Processing /docteur %s from user %s", subCommand.Name, i.Member.User.Username)
-		
+
 		// Handle different subcommands
 		switch subCommand.Name {
 		case "add":
@@ -321,6 +337,8 @@ func handleSlashCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			handleSlashProfits(s, i, subCommand)
 		case "help":
 			handleSlashHelp(s, i)
+		case "info":
+			handleSlashInfo(s, i)
 		}
 	}
 }
@@ -336,10 +354,19 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 		optionMap[opt.Name] = opt
 	}
 
-	// Get item name and estimated value
+	// Get item name and amount
 	itemName := optionMap["name"].StringValue()
-	estimatedValue := optionMap["amount"].IntValue()
-	
+	amount := optionMap["amount"].IntValue()
+
+	// Get estimated value based on historical data
+	estimatedValue := int64(0)
+	avgPrice, err := db.GetAveragePrice(itemName)
+	if err != nil {
+		log.Printf("[Add] Warning: Failed to get average price: %v", err)
+	} else if avgPrice > 0 {
+		estimatedValue = int64(avgPrice * float64(amount))
+	}
+
 	// Get seller, defaulting to command caller if not specified
 	var seller *discordgo.User
 	if sellerOpt, ok := optionMap["seller"]; ok && sellerOpt.UserValue(s) != nil {
@@ -364,26 +391,26 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 
 	// Parse participants
 	participantMentions := strings.Split(participantsStr, ",")
-	
+
 	// Create a map to track unique participants
 	uniqueParticipants := make(map[string]bool)
 	var participants []string
-	
+
 	// Add seller to participants
 	uniqueParticipants[seller.ID] = true
 	participants = append(participants, seller.ID)
-	
+
 	// Add other participants
 	botID := s.State.User.ID
 	duplicateFound := false
 	var duplicateUser string
-	
+
 	// Regular expression to match valid Discord mentions
 	validMentionRegex := regexp.MustCompile(`^<@!?\d+>$`)
-	
+
 	for _, mention := range participantMentions {
 		mention = strings.TrimSpace(mention)
-		
+
 		// Check if this is a multi-mention string (e.g., "@user1 @user2 @user3")
 		if strings.Contains(mention, " ") {
 			// Split by space and process each potential mention
@@ -393,7 +420,7 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 				if part == "" {
 					continue
 				}
-				
+
 				// Validate mention format
 				if !validMentionRegex.MatchString(part) {
 					log.Printf("[Add] Rejected: Invalid mention format: %s", part)
@@ -405,11 +432,11 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 					})
 					return
 				}
-				
+
 				userID := strings.TrimPrefix(part, "<@")
 				userID = strings.TrimPrefix(userID, "!") // Handle nickname mentions
 				userID = strings.TrimSuffix(userID, ">")
-				
+
 				// Skip if this is the bot
 				if userID != botID {
 					if uniqueParticipants[userID] {
@@ -433,7 +460,7 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 				})
 				return
 			}
-			
+
 			// Validate single mention format
 			if mention != "" && !validMentionRegex.MatchString(mention) {
 				log.Printf("[Add] Rejected: Invalid mention format: %s", mention)
@@ -445,7 +472,7 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 				})
 				return
 			}
-			
+
 			if mention != "" {
 				userID := strings.TrimPrefix(mention, "<@")
 				userID = strings.TrimPrefix(userID, "!") // Handle nickname mentions
@@ -462,7 +489,7 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 				}
 			}
 		}
-		
+
 		if duplicateFound {
 			break
 		}
@@ -486,13 +513,19 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 	})
 
 	// Add item to database
-	itemID, err := db.AddItem(itemName, estimatedValue, participants)
+	itemID, err := db.AddItem(itemName, amount, participants)
 	if err != nil {
 		log.Printf("[Add] Failed to add item: %v", err)
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: strPtr("❌ Failed to add item: " + err.Error()),
 		})
 		return
+	}
+
+	// Format estimated value string
+	estimatedValueStr := "No historical data available"
+	if estimatedValue > 0 {
+		estimatedValueStr = fmt.Sprintf("%d Exalted Orbs (based on recent sales)", estimatedValue)
 	}
 
 	// Assign the item to the seller
@@ -518,8 +551,13 @@ func handleSlashAdd(s *discordgo.Session, i *discordgo.InteractionCreate, data *
 		Color:       0x00ff00,
 		Fields: []*discordgo.MessageEmbedField{
 			{
+				Name:   "Amount",
+				Value:  fmt.Sprintf("%d items", amount),
+				Inline: true,
+			},
+			{
 				Name:   "Estimated Value",
-				Value:  fmt.Sprintf("%d Exalted Orbs", estimatedValue),
+				Value:  estimatedValueStr,
 				Inline: true,
 			},
 			{
@@ -577,10 +615,10 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 	// Filter items if needed
 	var filteredItems []db.Item
 	for _, item := range items {
-		if filter == "" || 
-		   (filter == "pending" && item.Status == "assigned") ||
-		   (filter == "sold" && item.Status == "sold") ||
-		   (filter == "distributed" && item.Status == "distributed") {
+		if filter == "" ||
+			(filter == "pending" && item.Status == "assigned") ||
+			(filter == "sold" && item.Status == "sold") ||
+			(filter == "distributed" && item.Status == "distributed") {
 			filteredItems = append(filteredItems, item)
 		}
 	}
@@ -609,7 +647,7 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 
 	for i := 0; i < maxItems; i++ {
 		item := filteredItems[i]
-		
+
 		// Format status with emoji
 		var statusEmoji string
 		switch item.Status {
@@ -620,18 +658,27 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 		case "distributed":
 			statusEmoji = "✅"
 		}
-		
+
 		// Format value
 		var valueStr string
 		if item.Status == "sold" || item.Status == "distributed" {
 			valueStr = fmt.Sprintf("%d Exalted Orbs (sold)", item.SaleAmount)
 		} else {
-			valueStr = fmt.Sprintf("%d Exalted Orbs (est.)", item.EstimatedValue)
+			avgPrice, err := db.GetAveragePrice(item.Name)
+			if err != nil {
+				log.Printf("[List] Warning: Failed to get average price: %v", err)
+				valueStr = fmt.Sprintf("%d items", item.EstimatedValue)
+			} else if avgPrice > 0 {
+				estimatedValue := int64(avgPrice * float64(item.EstimatedValue))
+				valueStr = fmt.Sprintf("%d items (Est. %d Exalted Orbs)", item.EstimatedValue, estimatedValue)
+			} else {
+				valueStr = fmt.Sprintf("%d items", item.EstimatedValue)
+			}
 		}
 
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name: fmt.Sprintf("#%d: %s %s", item.ID, statusEmoji, item.Name),
-			Value: valueStr,
+			Name:   fmt.Sprintf("#%d: %s %s", item.ID, statusEmoji, item.Name),
+			Value:  valueStr,
 			Inline: false,
 		})
 	}
@@ -715,24 +762,36 @@ func handleSlashView(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 			Inline: true,
 		},
 		{
-			Name:   "Estimated Value",
-			Value:  fmt.Sprintf("%d Exalted Orbs", item.EstimatedValue),
-			Inline: true,
-		},
-		{
-			Name:   "Seller",
-			Value:  fmt.Sprintf("<@%s>", item.AssignedTo),
+			Name:   "Amount",
+			Value:  fmt.Sprintf("%d items", item.EstimatedValue),
 			Inline: true,
 		},
 	}
 
-	// Add sale amount field if sold
-	if item.Status == "sold" || item.Status == "distributed" {
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "Sale Amount",
-			Value:  fmt.Sprintf("%d Exalted Orbs", item.SaleAmount),
-			Inline: true,
-		})
+	// Add estimated value field if item is pending
+	if item.Status == "assigned" {
+		avgPrice, err := db.GetAveragePrice(item.Name)
+		if err != nil {
+			log.Printf("[View] Warning: Failed to get average price: %v", err)
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   "Estimated Value",
+				Value:  "No historical data available",
+				Inline: true,
+			})
+		} else if avgPrice > 0 {
+			estimatedValue := int64(avgPrice * float64(item.EstimatedValue))
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   "Estimated Value",
+				Value:  fmt.Sprintf("%d Exalted Orbs", estimatedValue),
+				Inline: true,
+			})
+		} else {
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   "Estimated Value",
+				Value:  "No historical data available",
+				Inline: true,
+			})
+		}
 	}
 
 	// Add participants field
@@ -794,7 +853,7 @@ func handleSlashSell(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 		})
 		return
 	}
-	
+
 	saleAmount := optionMap["amount"].IntValue()
 
 	// Acknowledge the interaction
@@ -834,27 +893,27 @@ func handleSlashSell(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 	numParticipants := int64(len(item.Participants))
 	baseShareAmount := saleAmount / numParticipants
 	remainder := saleAmount % numParticipants
-	
+
 	// Create a map to track individual shares
 	shares := make(map[string]int64)
-	
+
 	// Initialize all shares with the base amount
 	for _, p := range item.Participants {
 		shares[p.UserID] = baseShareAmount
 	}
-	
+
 	// Handle remainder distribution
 	var extraInfo string
 	if remainder > 0 {
 		// First, give one extra to the seller
 		shares[item.AssignedTo]++
 		remainder--
-		
+
 		if remainder == 0 {
 			extraInfo = fmt.Sprintf("Seller <@%s> received 1 extra Exalted Orb due to uneven division.", item.AssignedTo)
 		} else {
 			extraInfo = fmt.Sprintf("Seller <@%s> received 1 extra Exalted Orb. ", item.AssignedTo)
-			
+
 			// If there's still a remainder, distribute randomly (but not to seller again)
 			var otherParticipants []string
 			for _, p := range item.Participants {
@@ -862,20 +921,20 @@ func handleSlashSell(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 					otherParticipants = append(otherParticipants, p.UserID)
 				}
 			}
-			
+
 			// Shuffle the participants to randomize distribution
 			rand.Seed(time.Now().UnixNano())
 			rand.Shuffle(len(otherParticipants), func(i, j int) {
 				otherParticipants[i], otherParticipants[j] = otherParticipants[j], otherParticipants[i]
 			})
-			
+
 			// Distribute remaining exalted orbs (max 1 per person)
 			var luckyParticipants []string
 			for i := 0; i < int(remainder) && i < len(otherParticipants); i++ {
 				shares[otherParticipants[i]]++
 				luckyParticipants = append(luckyParticipants, fmt.Sprintf("<@%s>", otherParticipants[i]))
 			}
-			
+
 			if len(luckyParticipants) > 0 {
 				extraInfo += fmt.Sprintf("Additionally, %s randomly received 1 extra Exalted Orb each due to uneven division.", strings.Join(luckyParticipants, ", "))
 			}
@@ -921,7 +980,7 @@ func handleSlashSell(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 			Inline: false,
 		},
 	}
-	
+
 	// Add extra info field if there was a remainder
 	if extraInfo != "" {
 		fields = append(fields, &discordgo.MessageEmbedField{
@@ -1022,7 +1081,7 @@ func handleSlashProfits(s *discordgo.Session, i *discordgo.InteractionCreate, da
 
 		// Format the last profit date
 		lastProfitStr := profit.LastProfit.Format("Jan 02")
-		
+
 		leaderboard.WriteString(fmt.Sprintf("%s <@%s>: %d Exalted Orbs (Last: %s)\n",
 			prefix, profit.UserID, profit.Total, lastProfitStr))
 	}
@@ -1121,7 +1180,43 @@ func handleSlashHelp(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	log.Printf("[Help] Successfully displayed help information")
 }
 
+// handleSlashInfo handles the /docteur info command
+func handleSlashInfo(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	log.Printf("[Command] Processing info request from user %s", i.Member.User.Username)
+
+	// Read version file
+	versionData, err := os.ReadFile("version.txt")
+	if err != nil {
+		versionData = []byte("Version information not available")
+	}
+
+	// Calculate uptime
+	uptime := time.Since(startTime)
+	days := int(uptime.Hours() / 24)
+	hours := int(uptime.Hours()) % 24
+	minutes := int(uptime.Minutes()) % 60
+
+	response := fmt.Sprintf("```\n%s\nUptime: %d days, %d hours, %d minutes```",
+		string(versionData),
+		days,
+		hours,
+		minutes)
+
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: response,
+		},
+	})
+
+	if err != nil {
+		log.Printf("[Error] Failed to respond to info command: %v", err)
+	} else {
+		log.Printf("[Success] Displayed info for user %s", i.Member.User.Username)
+	}
+}
+
 // Helper function to convert string to pointer
 func strPtr(s string) *string {
 	return &s
-} 
+}

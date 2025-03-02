@@ -334,7 +334,7 @@ func GetItem(itemID int64) (*Item, error) {
 	item := &Item{}
 	var nullSaleAmount sql.NullInt64
 	var nullAssignedTo sql.NullString
-	
+
 	err := db.QueryRow(`
 		SELECT id, name, estimated_value, status, assigned_to, sale_amount, created_at, updated_at
 		FROM items WHERE id = ?
@@ -348,14 +348,14 @@ func GetItem(itemID int64) (*Item, error) {
 		}
 		return nil, err
 	}
-	
+
 	// Convert NullInt64 to int64 (0 if NULL)
 	if nullSaleAmount.Valid {
 		item.SaleAmount = nullSaleAmount.Int64
 	} else {
 		item.SaleAmount = 0
 	}
-	
+
 	// Convert NullString to string (empty if NULL)
 	if nullAssignedTo.Valid {
 		item.AssignedTo = nullAssignedTo.String
@@ -376,18 +376,18 @@ func GetItem(itemID int64) (*Item, error) {
 	for rows.Next() {
 		var p Participant
 		var nullShareAmount sql.NullInt64
-		
+
 		if err := rows.Scan(&p.ID, &p.ItemID, &p.UserID, &nullShareAmount); err != nil {
 			return nil, err
 		}
-		
+
 		// Convert NullInt64 to int64 (0 if NULL)
 		if nullShareAmount.Valid {
 			p.ShareAmount = nullShareAmount.Int64
 		} else {
 			p.ShareAmount = 0
 		}
-		
+
 		item.Participants = append(item.Participants, p)
 	}
 
@@ -410,28 +410,28 @@ func ListItems() ([]Item, error) {
 		var item Item
 		var nullSaleAmount sql.NullInt64
 		var nullAssignedTo sql.NullString
-		
+
 		if err := rows.Scan(
 			&item.ID, &item.Name, &item.EstimatedValue, &item.Status,
 			&nullAssignedTo, &nullSaleAmount, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
-		
+
 		// Convert NullInt64 to int64 (0 if NULL)
 		if nullSaleAmount.Valid {
 			item.SaleAmount = nullSaleAmount.Int64
 		} else {
 			item.SaleAmount = 0
 		}
-		
+
 		// Convert NullString to string (empty if NULL)
 		if nullAssignedTo.Valid {
 			item.AssignedTo = nullAssignedTo.String
 		} else {
 			item.AssignedTo = ""
 		}
-		
+
 		items = append(items, item)
 	}
 
@@ -480,7 +480,7 @@ func GetTotalUserProfit(userID string) (int64, error) {
 		FROM profit_history
 		WHERE user_id = ?
 	`, userID).Scan(&total)
-	
+
 	return total, err
 }
 
@@ -512,6 +512,37 @@ func GetAllProfitHistory() ([]ProfitRecord, error) {
 	return records, nil
 }
 
+// GetAveragePrice returns the average sale price for items with the same name
+func GetAveragePrice(itemName string) (float64, error) {
+	rows, err := db.Query(`
+		SELECT sale_amount 
+		FROM items 
+		WHERE name = ? AND status = 'distributed'
+		ORDER BY updated_at DESC
+		LIMIT 5`, itemName)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var total int64
+	var count int
+	for rows.Next() {
+		var amount int64
+		if err := rows.Scan(&amount); err != nil {
+			return 0, err
+		}
+		total += amount
+		count++
+	}
+
+	if count == 0 {
+		return 0, nil
+	}
+
+	return float64(total) / float64(count), nil
+}
+
 // Close closes the database connection
 func Close() {
 	if db != nil {
@@ -519,4 +550,4 @@ func Close() {
 			log.Printf("Error closing database: %v", err)
 		}
 	}
-} 
+}

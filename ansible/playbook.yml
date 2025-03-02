@@ -97,6 +97,24 @@
         recurse: yes
       become: yes
 
+    - name: Get current git commit
+      command:
+        cmd: git rev-parse HEAD
+        chdir: "{{ bot_home }}/dr-peste"
+      register: git_commit
+      changed_when: false
+      become: yes
+      become_user: root
+
+    - name: Create version file
+      template:
+        src: templates/version.txt.j2
+        dest: "{{ bot_home }}/dr-peste/version.txt"
+        owner: "{{ bot_user }}"
+        group: "{{ bot_user }}"
+        mode: '0644'
+      notify: restart dr-peste
+
     - name: Compile bot binary
       command:
         cmd: /usr/local/go/bin/go build -o {{ bot_home }}/bin/dr-peste
