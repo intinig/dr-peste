@@ -8,15 +8,22 @@ dr-peste.exe
 
 # Environment variables
 .env
+*.env
+.env.*
+!.env.example
 
 # Database files
 data/
+*.db
+*.sqlite
+*.sqlite3
 
 # Test binary, built with `go test -c`
 *.test
 
 # Output of the go coverage tool
 *.out
+coverage.html
 
 # Dependency directories
 vendor/
@@ -25,4 +32,22 @@ vendor/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+*.swn
+*~
+.DS_Store
+
+# Ansible
+ansible/inventory.yml
+ansible/group_vars/all.yml
+*.retry
+ansible/*.log
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+

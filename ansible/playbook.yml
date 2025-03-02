@@ -1,0 +1,73 @@
+---
+- name: Deploy Dr. Peste Discord Bot
+  hosts: dr_peste
+  become: yes
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - git
+          - wget
+        state: present
+
+    - name: Download Go
+      get_url:
+        url: "https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        checksum: "sha256:{{ go_checksum }}"
+
+    - name: Extract Go
+      unarchive:
+        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: /usr/local
+        remote_src: yes
+        creates: /usr/local/go
+
+    - name: Set Go environment variables
+      lineinfile:
+        path: /etc/profile.d/go.sh
+        line: "{{ item }}"
+        create: yes
+        mode: '0644'
+      with_items:
+        - 'export PATH=$PATH:/usr/local/go/bin'
+        - 'export GOPATH=/usr/local/go'
+
+    - name: Create bot user
+      user:
+        name: "{{ bot_user }}"
+        shell: /bin/bash
+        create_home: yes
+        system: yes
+
+    - name: Clone/update repository
+      git:
+        repo: "{{ bot_repo }}"
+        dest: "{{ bot_home }}/dr-peste"
+        force: yes
+      become_user: "{{ bot_user }}"
+
+    - name: Create systemd service
+      template:
+        src: templates/dr-peste.service.j2
+        dest: /etc/systemd/system/dr-peste.service
+        mode: '0644'
+      notify: restart dr-peste
+
+    - name: Enable and start dr-peste service
+      systemd:
+        name: dr-peste
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+  handlers:
+    - name: restart dr-peste
+      systemd:
+        name: dr-peste
+        state: restarted 

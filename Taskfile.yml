@@ -27,4 +27,7 @@ tasks:
     desc: Initialize environment
     cmds:
       - powershell -Command "if (!(Test-Path .env)) { Copy-Item .env.example .env }"
-      - echo Please edit .env file with your Discord bot token 
+      - echo Please edit .env file with your Discord bot token
+      - powershell -Command "if (!(Test-Path ansible/inventory.yml)) { Copy-Item ansible/inventory.yml.example ansible/inventory.yml }"
+      - powershell -Command "if (!(Test-Path ansible/group_vars/all.yml)) { Copy-Item ansible/group_vars/all.yml.example ansible/group_vars/all.yml }"
+      - echo Please edit ansible/inventory.yml with your VPS info and ansible/group_vars/all.yml with your Discord token 

@@ -1,0 +1,15 @@
+[Unit]
+Description=Dr. Peste Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User={{ bot_user }}
+WorkingDirectory={{ bot_home }}/dr-peste
+ExecStart=/usr/local/go/bin/go run main.go
+Restart=always
+RestartSec=10
+Environment=DISCORD_TOKEN={{ discord_token }}
+
+[Install]
+WantedBy=multi-user.target 
