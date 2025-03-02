@@ -1,0 +1,30 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the application
+    cmds:
+      - go build -o dr-peste.exe
+
+  run:
+    desc: Run the application
+    deps: [build]
+    cmds:
+      - ./dr-peste.exe
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f dr-peste.exe
+      - rm -rf data/*.db
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+
+  init:
+    desc: Initialize environment
+    cmds:
+      - powershell -Command "if (!(Test-Path .env)) { Copy-Item .env.example .env }"
+      - echo Please edit .env file with your Discord bot token 
