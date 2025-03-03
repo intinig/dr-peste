@@ -217,8 +217,11 @@ func handleItemAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate
 		itemName := strings.ToLower(item.Name)
 
 		if strings.Contains(idStr, query) || strings.Contains(itemName, query) {
-			// Format the choice with ID and name
+			// Format the choice with ID, name, and seller
 			choiceName := fmt.Sprintf("#%d: %s", item.ID, item.Name)
+			if item.AssignedTo != "" {
+				choiceName += fmt.Sprintf(" (🔖 <@%s>)", item.AssignedTo)
+			}
 
 			// Add status indicator
 			switch item.Status {
@@ -648,36 +651,30 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 	for i := 0; i < maxItems; i++ {
 		item := filteredItems[i]
 
-		// Format status with emoji
-		var statusEmoji string
-		switch item.Status {
-		case "assigned":
-			statusEmoji = "⏳"
-		case "sold":
-			statusEmoji = "💰"
-		case "distributed":
-			statusEmoji = "✅"
+		// Format value and seller info
+		var valueStr string
+		var sellerInfo string
+		if item.AssignedTo != "" {
+			sellerInfo = fmt.Sprintf(" • 🔖 <@%s>", item.AssignedTo)
 		}
 
-		// Format value
-		var valueStr string
 		if item.Status == "sold" || item.Status == "distributed" {
-			valueStr = fmt.Sprintf("%d Exalted Orbs (sold)", item.SaleAmount)
+			valueStr = fmt.Sprintf("%d Exalted Orbs (sold)%s", item.SaleAmount, sellerInfo)
 		} else {
 			avgPrice, err := db.GetAveragePrice(item.Name)
 			if err != nil {
 				log.Printf("[List] Warning: Failed to get average price: %v", err)
-				valueStr = fmt.Sprintf("%d items", item.EstimatedValue)
+				valueStr = fmt.Sprintf("%d items%s", item.EstimatedValue, sellerInfo)
 			} else if avgPrice > 0 {
 				estimatedValue := int64(avgPrice * float64(item.EstimatedValue))
-				valueStr = fmt.Sprintf("%d items (Est. %d Exalted Orbs)", item.EstimatedValue, estimatedValue)
+				valueStr = fmt.Sprintf("%d items (Est. %d Exalted Orbs)%s", item.EstimatedValue, estimatedValue, sellerInfo)
 			} else {
-				valueStr = fmt.Sprintf("%d items", item.EstimatedValue)
+				valueStr = fmt.Sprintf("%d items%s", item.EstimatedValue, sellerInfo)
 			}
 		}
 
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   fmt.Sprintf("#%d: %s %s", item.ID, statusEmoji, item.Name),
+			Name:   fmt.Sprintf("#%d: %s", item.ID, valueStr),
 			Value:  valueStr,
 			Inline: false,
 		})
@@ -764,6 +761,11 @@ func handleSlashView(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 		{
 			Name:   "Amount",
 			Value:  fmt.Sprintf("%d items", item.EstimatedValue),
+			Inline: true,
+		},
+		{
+			Name:   "Seller",
+			Value:  fmt.Sprintf("<@%s>", item.AssignedTo),
 			Inline: true,
 		},
 	}
