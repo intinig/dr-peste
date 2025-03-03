@@ -651,6 +651,17 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 	for i := 0; i < maxItems; i++ {
 		item := filteredItems[i]
 
+		// Get status emoji
+		var statusEmoji string
+		switch item.Status {
+		case "assigned":
+			statusEmoji = "⏳"
+		case "sold":
+			statusEmoji = "💰"
+		case "distributed":
+			statusEmoji = "✅"
+		}
+
 		// Format value and seller info
 		var valueStr string
 		var sellerInfo string
@@ -674,7 +685,7 @@ func handleSlashList(s *discordgo.Session, i *discordgo.InteractionCreate, data 
 		}
 
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   fmt.Sprintf("#%d: %s", item.ID, valueStr),
+			Name:   fmt.Sprintf("#%d: %s %s", item.ID, statusEmoji, item.Name),
 			Value:  valueStr,
 			Inline: false,
 		})
