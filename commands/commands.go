@@ -220,7 +220,14 @@ func handleItemAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate
 			// Format the choice with ID, name, and seller
 			choiceName := fmt.Sprintf("#%d: %s", item.ID, item.Name)
 			if item.AssignedTo != "" {
-				choiceName += fmt.Sprintf(" (🔖 <@%s>)", item.AssignedTo)
+				// Get the seller's user object
+				seller, err := s.User(item.AssignedTo)
+				if err != nil {
+					log.Printf("Error getting seller info: %v", err)
+					choiceName += fmt.Sprintf(" (🔖 Unknown User)")
+				} else {
+					choiceName += fmt.Sprintf(" (🔖 %s)", seller.Username)
+				}
 			}
 
 			// Add status indicator
